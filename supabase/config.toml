@@ -1,0 +1,12 @@
+project_id = "citylink"
+
+# Subscriber-facing functions are public (no Supabase JWT required): they
+# authenticate by contract+password or by source IP and issue their own session token.
+[functions.subscriber-login]
+verify_jwt = false
+
+[functions.subscriber-ip-login]
+verify_jwt = false
+
+[functions.subscriber-me]
+verify_jwt = false

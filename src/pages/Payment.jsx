@@ -1,76 +1,112 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Smartphone, Globe, CreditCard, Banknote, Check } from 'lucide-react'
+import { Globe, Check, Copy, ExternalLink, ShieldCheck, Info } from 'lucide-react'
 import { PageHero, SectionHeader, Reveal } from '../components/ui.jsx'
-import { payments } from '../data/site.js'
 
-const icons = {
-  'privat24-app': Smartphone,
-  'privatbank-site': Globe,
-  'any-card': CreditCard,
-  easypay: Banknote,
-}
+const PRIVAT24_URL = 'https://next.privat24.ua/'
+const PRESET = [100, 170, 240, 280, 500, 1000]
 
 export default function Payment() {
-  const [active, setActive] = useState(payments[0].id)
-  const current = payments.find((p) => p.id === active)
-  const Icon = icons[current.id] || CreditCard
+  const [contract, setContract] = useState('')
+  const [amount, setAmount] = useState('')
+  const [copied, setCopied] = useState('')
+
+  const copy = async (text, key) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(key)
+      setTimeout(() => setCopied(''), 1800)
+    } catch { /* clipboard unavailable */ }
+  }
+
+  const pay = () => {
+    window.open(PRIVAT24_URL, '_blank', 'noopener')
+  }
 
   return (
     <>
       <PageHero
         eyebrow="Оплата послуг"
-        title="Зручні способи оплати"
-        subtitle="Поповнюйте рахунок будь-яким зручним способом. Зарахування — від кількох хвилин."
+        title="Оплата через ПриватБанк"
+        subtitle="Вкажіть суму та номер договору — і перейдіть до оплати в захищеному сервісі Приват24."
       />
 
       <section className="container-px py-14">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {payments.map((p, i) => {
-            const PIcon = icons[p.id] || CreditCard
-            const isActive = active === p.id
-            return (
-              <Reveal key={p.id} delay={i * 70}>
-                <button
-                  onClick={() => setActive(p.id)}
-                  className={`card h-full w-full p-6 text-left transition hover:-translate-y-1 ${
-                    isActive ? 'border-brand-400/50 shadow-glow' : 'hover:border-brand-400/30'
-                  }`}
-                >
-                  <span className={`grid h-11 w-11 place-items-center rounded-xl ${isActive ? 'bg-brand-500 text-white' : 'bg-brand-500/15 text-brand-300'}`}>
-                    <PIcon className="h-6 w-6" />
-                  </span>
-                  <h3 className="mt-4 font-bold text-white">{p.title}</h3>
-                  <p className="mt-1 text-sm text-slate-400">{p.desc}</p>
-                </button>
-              </Reveal>
-            )
-          })}
-        </div>
+        <div className="grid gap-6 lg:grid-cols-5">
+          {/* Form */}
+          <Reveal className="lg:col-span-3">
+            <div className="card p-7">
+              <div className="flex items-center gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-accent-500 text-white">
+                  <Globe className="h-6 w-6" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-extrabold text-white">Реквізити платежу</h2>
+                  <p className="text-sm text-slate-400">next.privat24.ua</p>
+                </div>
+              </div>
 
-        <Reveal className="mt-10">
-          <div className="card p-8">
-            <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-500/15 text-brand-300">
-                <Icon className="h-6 w-6" />
-              </span>
-              <h2 className="text-xl font-extrabold text-white">{current.title}</h2>
+              <label className="label mt-7">Номер договору (особовий рахунок)</label>
+              <div className="flex gap-2">
+                <input className="input font-mono" inputMode="numeric" value={contract}
+                  onChange={(e) => setContract(e.target.value.replace(/\D/g, ''))} placeholder="1001" />
+                <button type="button" onClick={() => copy(contract, 'c')} disabled={!contract}
+                  className="btn-ghost shrink-0 px-3 disabled:opacity-50" title="Копіювати">
+                  {copied === 'c' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <label className="label mt-6">Сума, грн</label>
+              <input className="input" inputMode="numeric" value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} placeholder="240" />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {PRESET.map((a) => (
+                  <button key={a} type="button" onClick={() => setAmount(String(a))}
+                    className={`rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+                      amount === String(a) ? 'border-brand-400/60 bg-brand-400/10 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                    }`}>{a} грн</button>
+                ))}
+              </div>
+
+              <button onClick={pay} className="btn-primary mt-7 w-full">
+                Оплатити через Приват24 <ExternalLink className="h-4 w-4" />
+              </button>
+
+              <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-100">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Дані картки вводяться лише на захищеній сторінці ПриватБанку — ми їх не збираємо й не зберігаємо.
+                  Скопіюйте номер договору, у Приват24 знайдіть отримувача <b>CityLink</b> у розділі «Інтернет» і вкажіть суму.
+                </span>
+              </div>
             </div>
-            <ol className="mt-6 space-y-4">
-              {current.steps.map((s, idx) => (
-                <li key={idx} className="flex gap-4">
-                  <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-sm font-bold text-white">
-                    {idx + 1}
-                  </span>
-                  <p className="pt-1 text-slate-300">{s}</p>
-                </li>
-              ))}
-            </ol>
-            <div className="mt-6 flex items-center gap-2 rounded-xl bg-brand-500/10 p-4 text-sm text-brand-100">
-              <Check className="h-4 w-4 flex-none" /> Для оплати завжди потрібен лише номер вашого договору (особового рахунку).
+          </Reveal>
+
+          {/* Steps + summary */}
+          <Reveal delay={120} className="lg:col-span-2">
+            <div className="card sticky top-24 p-7">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+                <ShieldCheck className="h-5 w-5 text-brand-400" /> Як оплатити
+              </div>
+              <ol className="mt-5 space-y-4 text-sm">
+                {[
+                  'Натисніть «Оплатити через Приват24» — відкриється next.privat24.ua.',
+                  'Авторизуйтесь і оберіть «Усі послуги» → «Інтернет».',
+                  'Знайдіть постачальника CityLink.',
+                  'Введіть номер договору та суму, підтвердіть оплату карткою.',
+                ].map((s, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-xs font-bold text-white">{i + 1}</span>
+                    <p className="pt-0.5 text-slate-300">{s}</p>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-6 flex items-center gap-2 rounded-xl bg-brand-500/10 p-4 text-sm text-brand-100">
+                <Check className="h-4 w-4 flex-none" /> Зарахування коштів — протягом кількох хвилин.
+              </div>
             </div>
-          </div>
-        </Reveal>
+          </Reveal>
+        </div>
 
         <Reveal className="mt-10">
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-brand-600/20 to-accent-600/20 p-10 text-center">

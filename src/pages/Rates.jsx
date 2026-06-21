@@ -2,14 +2,20 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, Gauge, Star, Globe, Router, Calculator, ArrowRight } from 'lucide-react'
 import { PageHero, SectionHeader, Reveal } from '../components/ui.jsx'
-import { rates, STATIC_IP_PRICE } from '../data/site.js'
+import { STATIC_IP_PRICE } from '../data/site.js'
+import { useTariffs } from '../hooks/useTariffs.js'
 
 export default function Rates() {
-  const [selected, setSelected] = useState(rates.find((r) => r.popular)?.id || rates[0].id)
+  const { tariffs: rates } = useTariffs()
+  const [selected, setSelected] = useState(null)
   const [staticIp, setStaticIp] = useState(false)
   const [months, setMonths] = useState(1)
 
-  const plan = useMemo(() => rates.find((r) => r.id === selected), [selected])
+  const plan = useMemo(
+    () => rates.find((r) => r.id === selected) || rates.find((r) => r.popular) || rates[0],
+    [rates, selected],
+  )
+  if (!plan) return null
   const monthly = plan.price + (staticIp ? STATIC_IP_PRICE : 0)
   const total = monthly * months
 
@@ -82,7 +88,7 @@ export default function Rates() {
                     key={r.id}
                     onClick={() => setSelected(r.id)}
                     className={`rounded-xl border p-4 text-left transition ${
-                      selected === r.id
+                      plan.id === r.id
                         ? 'border-brand-400/60 bg-brand-400/10'
                         : 'border-white/10 bg-white/5 hover:border-white/20'
                     }`}

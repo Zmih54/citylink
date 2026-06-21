@@ -65,7 +65,7 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="container-px flex flex-col items-center justify-between gap-2 py-5 text-xs text-slate-500 sm:flex-row">
           <p>© {new Date().getFullYear()} {company.name}. Усі права захищені.</p>
-          <p>Зроблено з турботою про якість зв'язку.</p>
+          <a className="link-muted" href="#/admin/login">Адмінпанель</a>
         </div>
       </div>
     </footer>

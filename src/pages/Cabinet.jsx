@@ -1,63 +1,101 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   User, Lock, LogIn, LogOut, Wallet, Gauge, Calendar, MapPin,
-  CheckCircle2, Plus, Loader2, Info, CreditCard,
+  Loader2, Info, CreditCard, Wifi, ShieldAlert,
 } from 'lucide-react'
 import { PageHero, Reveal } from '../components/ui.jsx'
-import { demoAccount } from '../data/site.js'
+import { hasSupabase } from '../lib/supabase.js'
+import { subscriberLogin, subscriberIpLogin, subscriberMe } from '../lib/api.js'
+
+const TOKEN_KEY = 'citylink-subscriber-token'
 
 export default function Cabinet() {
-  const [auth, setAuth] = useState(false)
+  const [account, setAccount] = useState(null)
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [booting, setBooting] = useState(true)     // restoring session / trying IP login
+  const [ipTrying, setIpTrying] = useState(false)
 
-  // local mutable copy so top-up updates the balance/history live
-  const [account, setAccount] = useState(demoAccount)
-  const [topup, setTopup] = useState('')
-  const [toast, setToast] = useState('')
+  // On open: restore a saved session, otherwise silently try IP-based login.
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      if (!hasSupabase) { setBooting(false); return }
+      const token = localStorage.getItem(TOKEN_KEY)
+      if (token) {
+        try {
+          const sub = await subscriberMe(token)
+          if (alive) setAccount(sub)
+        } catch {
+          localStorage.removeItem(TOKEN_KEY)
+        }
+      } else {
+        // Auto-login if this connection's IP belongs to an active subscriber.
+        try {
+          const { token: t, subscriber } = await subscriberIpLogin()
+          localStorage.setItem(TOKEN_KEY, t)
+          if (alive) setAccount(subscriber)
+        } catch {
+          /* IP not recognised — show the login form */
+        }
+      }
+      if (alive) setBooting(false)
+    })()
+    return () => { alive = false }
+  }, [])
 
-  const doLogin = (e) => {
+  const doLogin = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    setTimeout(() => {
+    try {
+      const { token, subscriber } = await subscriberLogin(login.trim(), password)
+      localStorage.setItem(TOKEN_KEY, token)
+      setAccount(subscriber)
+    } catch (err) {
+      setError(err.message)
+    } finally {
       setLoading(false)
-      if (login.trim() === demoAccount.login && password === demoAccount.password) {
-        setAuth(true)
-      } else {
-        setError('Невірний логін або пароль. Скористайтесь демо-доступом нижче.')
-      }
-    }, 700)
+    }
   }
 
-  const fillDemo = () => {
-    setLogin(demoAccount.login)
-    setPassword(demoAccount.password)
+  const doIpLogin = async () => {
+    setError('')
+    setIpTrying(true)
+    try {
+      const { token, subscriber } = await subscriberIpLogin()
+      localStorage.setItem(TOKEN_KEY, token)
+      setAccount(subscriber)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setIpTrying(false)
+    }
   }
 
-  const addFunds = (e) => {
-    e.preventDefault()
-    const amount = parseInt(topup, 10)
-    if (!amount || amount <= 0) return
-    setAccount((a) => ({
-      ...a,
-      balance: a.balance + amount,
-      payments: [
-        { date: new Date().toISOString().slice(0, 10), amount, method: 'Картка Visa', type: 'Поповнення' },
-        ...a.payments,
-      ],
-    }))
-    setTopup('')
-    setToast(`Рахунок поповнено на ${amount} грн`)
-    setTimeout(() => setToast(''), 3000)
+  const logout = () => {
+    localStorage.removeItem(TOKEN_KEY)
+    setAccount(null)
+    setLogin('')
+    setPassword('')
   }
 
-  const monthsLeft = account.monthlyFee > 0 ? Math.floor(account.balance / account.monthlyFee) : 0
+  if (booting) {
+    return (
+      <section className="container-px py-24">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <Loader2 className="h-7 w-7 animate-spin text-brand-400" />
+          <p>Перевіряємо вашу IP-адресу…</p>
+        </div>
+      </section>
+    )
+  }
 
-  if (!auth) {
+  // ---- Not logged in: login form -----------------------------------------
+  if (!account) {
     return (
       <>
         <PageHero eyebrow="Особистий кабінет" title="Вхід до кабінету" subtitle="Керуйте рахунком, переглядайте баланс, історію платежів та поповнюйте рахунок онлайн." />
@@ -69,6 +107,14 @@ export default function Cabinet() {
                   <User className="h-7 w-7" />
                 </span>
               </div>
+
+              {!hasSupabase && (
+                <div className="mb-5 flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>Бекенд ще не підключено. Кабінет запрацює після налаштування Supabase.</span>
+                </div>
+              )}
+
               <label className="label">Логін (номер договору)</label>
               <div className="relative mb-4">
                 <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -84,10 +130,17 @@ export default function Cabinet() {
                 {loading ? (<><Loader2 className="h-4 w-4 animate-spin" /> Вхід…</>) : (<><LogIn className="h-4 w-4" /> Увійти</>)}
               </button>
 
+              <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wider text-slate-500">
+                <span className="h-px flex-1 bg-white/10" /> або <span className="h-px flex-1 bg-white/10" />
+              </div>
+
+              <button type="button" onClick={doIpLogin} disabled={ipTrying} className="btn-ghost w-full disabled:opacity-70">
+                {ipTrying ? (<><Loader2 className="h-4 w-4 animate-spin" /> Перевірка IP…</>) : (<><Wifi className="h-4 w-4" /> Увійти за IP-адресою</>)}
+              </button>
+
               <div className="mt-5 rounded-xl border border-brand-400/20 bg-brand-400/5 p-4 text-sm text-slate-300">
-                <div className="flex items-center gap-2 font-semibold text-brand-200"><Info className="h-4 w-4" /> Демо-доступ</div>
-                <p className="mt-1">Логін <b className="text-white">1001</b>, пароль <b className="text-white">demo</b>.</p>
-                <button type="button" onClick={fillDemo} className="mt-2 text-sm font-semibold text-brand-300 hover:text-brand-200">Заповнити автоматично →</button>
+                <div className="flex items-center gap-2 font-semibold text-brand-200"><Info className="h-4 w-4" /> Вхід за IP</div>
+                <p className="mt-1">Якщо ви підключені через свою мережу CityLink зі статичною IP-адресою — вхід відбудеться автоматично, без пароля.</p>
               </div>
             </form>
           </Reveal>
@@ -96,31 +149,34 @@ export default function Cabinet() {
     )
   }
 
+  // ---- Logged in: dashboard ----------------------------------------------
+  const monthlyFee = account.tariff?.price || 0
+  const speed = account.tariff?.speed || 0
+  const tariffName = account.tariff?.name || '—'
+  const monthsLeft = monthlyFee > 0 ? Math.floor(account.balance / monthlyFee) : 0
+
   return (
     <section className="container-px py-12">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white">Вітаємо, {account.name.split(' ')[0]}!</h1>
+          <h1 className="text-3xl font-extrabold text-white">Вітаємо, {account.full_name.split(' ')[0]}!</h1>
           <p className="mt-1 flex items-center gap-2 text-sm text-slate-400"><MapPin className="h-4 w-4" /> {account.address}</p>
         </div>
-        <button onClick={() => setAuth(false)} className="btn-ghost"><LogOut className="h-4 w-4" /> Вийти</button>
+        <button onClick={logout} className="btn-ghost"><LogOut className="h-4 w-4" /> Вийти</button>
       </div>
-
-      {toast && (
-        <div className="mt-6 flex items-center gap-2 rounded-xl border border-brand-400/30 bg-brand-400/10 p-4 text-sm text-brand-100">
-          <CheckCircle2 className="h-4 w-4" /> {toast}
-        </div>
-      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
         {/* Balance */}
         <Reveal>
           <div className="card p-7">
             <div className="flex items-center gap-2 text-sm text-slate-400"><Wallet className="h-4 w-4 text-brand-400" /> Баланс</div>
-            <div className="mt-2 text-4xl font-extrabold text-white">{account.balance} <span className="text-lg">грн</span></div>
+            <div className="mt-2 text-4xl font-extrabold text-white">{Number(account.balance)} <span className="text-lg">грн</span></div>
             <p className="mt-2 text-sm text-slate-400">Вистачить приблизно на <b className="text-brand-200">{monthsLeft} міс</b> користування.</p>
-            <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Активний
+            <span className={`mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+              account.status === 'active' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${account.status === 'active' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              {account.status === 'active' ? 'Активний' : account.status === 'blocked' ? 'Заблокований' : 'Призупинений'}
             </span>
           </div>
         </Reveal>
@@ -129,8 +185,8 @@ export default function Cabinet() {
         <Reveal delay={80}>
           <div className="card p-7">
             <div className="flex items-center gap-2 text-sm text-slate-400"><Gauge className="h-4 w-4 text-brand-400" /> Тариф</div>
-            <div className="mt-2 text-2xl font-extrabold text-white">{account.tariff}</div>
-            <p className="text-sm text-slate-400">до {account.speed} Мбіт/с · {account.monthlyFee} грн/міс</p>
+            <div className="mt-2 text-2xl font-extrabold text-white">{tariffName}</div>
+            <p className="text-sm text-slate-400">до {speed} Мбіт/с · {monthlyFee} грн/міс</p>
             <Link to="/rates" className="btn-ghost mt-4 w-full">Змінити тариф</Link>
           </div>
         </Reveal>
@@ -139,28 +195,23 @@ export default function Cabinet() {
         <Reveal delay={160}>
           <div className="card p-7">
             <div className="flex items-center gap-2 text-sm text-slate-400"><Calendar className="h-4 w-4 text-brand-400" /> Наступне списання</div>
-            <div className="mt-2 text-2xl font-extrabold text-white">{new Date(account.nextCharge).toLocaleDateString('uk-UA')}</div>
+            <div className="mt-2 text-2xl font-extrabold text-white">
+              {account.next_charge ? new Date(account.next_charge).toLocaleDateString('uk-UA') : '—'}
+            </div>
             <p className="text-sm text-slate-400">Договір №{account.contract}</p>
           </div>
         </Reveal>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Top up */}
+        {/* Top up → Privat24 */}
         <Reveal className="lg:col-span-1">
-          <form onSubmit={addFunds} className="card p-7">
+          <div className="card p-7">
             <div className="flex items-center gap-2 font-bold text-white"><CreditCard className="h-5 w-5 text-brand-400" /> Поповнити рахунок</div>
-            <p className="mt-1 text-sm text-slate-400">Демонстрація онлайн-оплати карткою.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[100, 240, 500, 1000].map((a) => (
-                <button type="button" key={a} onClick={() => setTopup(String(a))} className={`rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
-                  topup === String(a) ? 'border-brand-400/60 bg-brand-400/10 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
-                }`}>{a} грн</button>
-              ))}
-            </div>
-            <input className="input mt-3" inputMode="numeric" value={topup} onChange={(e) => setTopup(e.target.value.replace(/\D/g, ''))} placeholder="Інша сума, грн" />
-            <button type="submit" className="btn-primary mt-4 w-full"><Plus className="h-4 w-4" /> Поповнити</button>
-          </form>
+            <p className="mt-1 text-sm text-slate-400">Оплата через ПриватБанк за номером договору <b className="text-white">{account.contract}</b>.</p>
+            <Link to="/payment" className="btn-primary mt-4 w-full">Перейти до оплати</Link>
+            <p className="mt-3 text-xs text-slate-500">Після оплати кошти зараховуються оператором — баланс оновиться протягом кількох хвилин.</p>
+          </div>
         </Reveal>
 
         {/* History */}
@@ -178,15 +229,18 @@ export default function Cabinet() {
                   </tr>
                 </thead>
                 <tbody>
-                  {account.payments.map((p, i) => {
-                    const income = p.type === 'Поповнення'
+                  {account.transactions.length === 0 && (
+                    <tr><td colSpan={4} className="py-6 text-center text-slate-500">Операцій ще немає</td></tr>
+                  )}
+                  {account.transactions.map((p, i) => {
+                    const income = String(p.type).startsWith('Поповнення')
                     return (
                       <tr key={i} className="border-b border-white/5">
-                        <td className="py-3 pr-4 text-slate-400">{new Date(p.date).toLocaleDateString('uk-UA')}</td>
+                        <td className="py-3 pr-4 text-slate-400">{new Date(p.created_at).toLocaleDateString('uk-UA')}</td>
                         <td className="py-3 pr-4 text-slate-200">{p.type}</td>
                         <td className="py-3 pr-4 text-slate-400">{p.method}</td>
                         <td className={`py-3 text-right font-semibold ${income ? 'text-emerald-300' : 'text-slate-300'}`}>
-                          {income ? '+' : '−'}{p.amount} грн
+                          {income ? '+' : '−'}{Number(p.amount)} грн
                         </td>
                       </tr>
                     )

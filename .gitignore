@@ -4,3 +4,8 @@ install.log
 *.log
 .DS_Store
 .vite/
+.env
+.env.local
+.env.*.local
+supabase/.temp/
+supabase/.branches/

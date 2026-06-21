@@ -4,7 +4,8 @@ import {
   ArrowRight, Check, Star, Tv, Gamepad2, Building2,
 } from 'lucide-react'
 import { Reveal, SectionHeader } from '../components/ui.jsx'
-import { rates, news, company } from '../data/site.js'
+import { news, company } from '../data/site.js'
+import { useTariffs } from '../hooks/useTariffs.js'
 
 const features = [
   { icon: Gauge, title: 'Оптика до квартири', text: 'Технологія FTTB/GPON: стабільна симетрична швидкість без просідань увечері.' },
@@ -28,6 +29,7 @@ const useCases = [
 ]
 
 export default function Home() {
+  const { tariffs: rates } = useTariffs()
   const topSpeed = Math.max(...rates.map((r) => r.speed))
   const minPrice = Math.min(...rates.map((r) => r.price))
 
