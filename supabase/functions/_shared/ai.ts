@@ -52,7 +52,7 @@ export async function askAI(
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-3-5-haiku-latest',
+        model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5',
         max_tokens: 500,
         system: KNOWLEDGE + context,
         messages: [{ role: 'user', content: question }],
