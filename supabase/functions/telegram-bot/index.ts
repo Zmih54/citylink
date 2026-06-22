@@ -3,7 +3,7 @@
 // tariff/history, AI answers (Claude Haiku) with operator escalation,
 // payments via Privat24 link and LiqPay card checkout.
 import { adminClient, loadSubscriber } from '../_shared/utils.ts'
-import { tg, btn, urlBtn, keyboard, mainMenu, esc } from '../_shared/telegram.ts'
+import { tg, btn, urlBtn, keyboard, mainMenu, esc, mdToHtml } from '../_shared/telegram.ts'
 import { askAI } from '../_shared/ai.ts'
 import { liqpayCheckoutUrl } from '../_shared/liqpay.ts'
 
@@ -251,12 +251,12 @@ Deno.serve(async (req) => {
     const sub = await getLinkedSubscriber(tgId)
     const tariffs = await listTariffs()
     const ai = await askAI(text, { tariffs, account: sub })
-    // AI output is free text — escape it so stray < or & don't break HTML parse_mode.
+    // AI output is free text — normalise Markdown to safe HTML (also escapes < & >).
     if (ai.escalate) {
-      if (ai.text) await tg.send(chatId, esc(ai.text))
+      if (ai.text) await tg.send(chatId, mdToHtml(ai.text))
       await escalate(chatId, tgId, [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || 'Абонент', msg.from?.username ?? '', text)
     } else {
-      await tg.send(chatId, esc(ai.text), mainMenu())
+      await tg.send(chatId, mdToHtml(ai.text), mainMenu())
     }
     return ok()
   } catch (e) {

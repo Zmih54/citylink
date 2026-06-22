@@ -46,3 +46,13 @@ export const mainMenu = () =>
 export function esc(s: string): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
+
+// Safety net for AI replies: turn common Markdown into Telegram-safe HTML so
+// stray **asterisks** / [links](...) don't show up literally under parse_mode=HTML.
+export function mdToHtml(s: string): string {
+  let t = esc(s) // escape &,<,> first — content is plain text from the model
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')           // **bold** -> <b>
+  t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>') // [t](url)
+  t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, '$1<i>$2</i>') // *italic*
+  return t
+}
