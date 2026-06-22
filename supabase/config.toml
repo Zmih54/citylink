@@ -10,3 +10,11 @@ verify_jwt = false
 
 [functions.subscriber-me]
 verify_jwt = false
+
+# Telegram webhook and LiqPay callback are public endpoints; they verify their
+# own secret/signature internally.
+[functions.telegram-bot]
+verify_jwt = false
+
+[functions.liqpay-callback]
+verify_jwt = false
