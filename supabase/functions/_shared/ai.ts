@@ -8,6 +8,7 @@ const KNOWLEDGE = `
 Ти — ввічливий віртуальний помічник інтернет-провайдера CityLink (місто Глухів, Україна).
 Відповідай КОРОТКО, дружньо, українською мовою. Не вигадуй фактів.
 Пиши звичайним текстом без Markdown-розмітки: не використовуй зірочки (* чи **), решітки (#), підкреслення (_) чи таблиці. За потреби роби короткі списки з тире (-). Телефони й посилання пиши просто текстом.
+Тримай відповідь стислою: зазвичай 2–4 речення або короткий список (до 4 пунктів). Давай лише суть, без зайвих вступів, повторів і довгих пояснень.
 
 ДОВІДКА ПРО КОМПАНІЮ:
 - CityLink — домашній оптичний інтернет у Глухові. Телефон підтримки: +38 (066) 026-10-75. Telegram-підтримка доступна тут.
@@ -55,7 +56,9 @@ export async function askAI(
       },
       body: JSON.stringify({
         model: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-haiku-4-5',
-        max_tokens: 500,
+        // Output tokens are the costly part; 350 fits a concise support answer
+        // (a few sentences or a short list). Override via ANTHROPIC_MAX_TOKENS.
+        max_tokens: Number(Deno.env.get('ANTHROPIC_MAX_TOKENS')) || 350,
         system: KNOWLEDGE + context,
         messages: [{ role: 'user', content: question }],
       }),
