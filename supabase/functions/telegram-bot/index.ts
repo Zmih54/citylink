@@ -13,6 +13,9 @@ const PRESETS = [100, 170, 240, 280, 500]
 const db = adminClient()
 const ADMIN_CHAT = Deno.env.get('ADMIN_CHAT_ID') ?? ''
 const WEBHOOK_SECRET = Deno.env.get('TELEGRAM_WEBHOOK_SECRET') ?? ''
+// Rendered prefix of operator-reply messages shown to the user. Must match the
+// text sent below — used to detect when the user replies to an operator.
+const OPERATOR_LABEL = '🧑‍💼 Оператор:'
 
 // ---- DB helpers ---------------------------------------------------------
 async function getLinkedSubscriber(tgId: number) {
@@ -101,6 +104,25 @@ async function escalate(chatId: number, tgId: number, fromName: string, username
   const msgId = res?.result?.message_id
   if (msgId) await db.from('telegram_relays').insert({ admin_msg_id: msgId, user_telegram_id: tgId })
   await tg.send(chatId, '🧑‍💼 Ваше запитання передано оператору. Ми відповімо тут, щойно зможемо. Дякуємо за терпіння!')
+}
+
+// User replied (in the bot) to an operator's message → relay it back to the
+// support chat and keep the thread open (operator can reply again).
+async function relayUserToOperator(chatId: number, tgId: number, user: any, text: string) {
+  if (!ADMIN_CHAT) {
+    await tg.send(chatId, '🧑‍💼 Підтримка зараз недоступна. Якщо терміново — телефонуйте +38 (066) 026-10-75.')
+    return
+  }
+  const sub = await getLinkedSubscriber(tgId)
+  const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Абонент'
+  const head = `💬 <b>Відповідь від ${esc(name)}</b>` +
+    (user?.username ? ` (@${esc(user.username)})` : '') +
+    (sub ? ` — договір <code>${esc(sub.contract)}</code>` : '') +
+    `\n<i>відповідайте reply на це повідомлення</i>\n\n`
+  const res = await tg.send(ADMIN_CHAT, head + esc(text))
+  const msgId = res?.result?.message_id
+  if (msgId) await db.from('telegram_relays').insert({ admin_msg_id: msgId, user_telegram_id: tgId })
+  await tg.send(chatId, '✅ Відповідь надіслано оператору.')
 }
 
 // ---- Command handlers ---------------------------------------------------
@@ -238,6 +260,13 @@ Deno.serve(async (req) => {
       return ok(await handleCommand(chatId, tgId, cmd, rest.join(' '), msg.from))
     }
 
+    // User replying to an operator's message → relay it back to the support chat.
+    const repliedTo = msg.reply_to_message
+    if (repliedTo?.from?.is_bot && String(repliedTo.text || '').startsWith(OPERATOR_LABEL)) {
+      await relayUserToOperator(chatId, tgId, msg.from, text)
+      return ok()
+    }
+
     // Stateful flows (linking, payment amount, operator)
     const state = await getState(tgId)
     if (state.mode) {
@@ -252,7 +281,13 @@ Deno.serve(async (req) => {
     const tariffs = await listTariffs()
     const ai = await askAI(text, { tariffs, account: sub })
     // AI output is free text — normalise Markdown to safe HTML (also escapes < & >).
-    if (ai.escalate) {
+    if (ai.operator) {
+      // User asked for an operator: don't forward the request phrase — collect
+      // their actual question next and forward that.
+      if (ai.text) await tg.send(chatId, mdToHtml(ai.text))
+      await setState(tgId, 'operator')
+      await tg.send(chatId, '🧑‍💼 Опишіть, будь ласка, ваше питання одним повідомленням — я передам його оператору.')
+    } else if (ai.escalate) {
       if (ai.text) await tg.send(chatId, mdToHtml(ai.text))
       await escalate(chatId, tgId, [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || 'Абонент', msg.from?.username ?? '', text)
     } else {

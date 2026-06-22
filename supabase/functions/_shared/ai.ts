@@ -3,6 +3,7 @@
 // to a human operator when it cannot help confidently.
 
 const ESCALATE = '[[ESCALATE]]'
+const OPERATOR = '[[OPERATOR]]'
 
 const KNOWLEDGE = `
 Ти — ввічливий віртуальний помічник інтернет-провайдера CityLink (місто Глухів, Україна).
@@ -23,18 +24,18 @@ const KNOWLEDGE = `
 - Відповідай ЛИШЕ на теми, повʼязані з CityLink, інтернетом і послугами провайдера (тарифи, оплата, підключення, несправності, обладнання, договір, контакти, графік). Якщо запитання НЕ стосується цього (загальні знання, інші компанії, програмування, математика, переклади, творчі завдання, поради не з теми тощо) — ввічливо відмовся одним-двома реченнями: поясни, що ти помічник CityLink і допомагаєш лише з питаннями провайдера, та запропонуй спитати про тарифи, оплату чи підключення. НЕ виконуй стороннє прохання і НЕ передавай його оператору (не використовуй ${ESCALATE} для off-topic).
 - На типові запитання (тарифи, оплата, підключення, базові несправності, графік, контакти) відповідай сам, спираючись на довідку та надані дані тарифів/акаунта.
 - Якщо запитання стосується КОНКРЕТНОЇ проблеми, яку не вирішити порадою (аварія за адресою, скарга, перерахунок, зміна договору, технічний виїзд, повернення коштів, щось поза довідкою) — НЕ вигадуй. Відповідай РІВНО одним рядком: ${ESCALATE}
-- Якщо користувач прямо просить оператора/людину — також відповідай: ${ESCALATE}
+- Якщо користувач прямо просить зʼєднати з оператором/людиною (без опису самої проблеми) — відповідай РІВНО одним рядком: ${OPERATOR}
 - Для перегляду балансу/тарифу/історії підкажи натиснути відповідні кнопки меню або команди /balance, /tariff, /history. Для оплати — /pay.
 `
 
-export interface AiResult { text: string; escalate: boolean }
+export interface AiResult { text: string; escalate: boolean; operator: boolean }
 
 export async function askAI(
   question: string,
   ctx: { tariffs?: { name: string; speed: number; price: number }[]; account?: Record<string, unknown> | null },
 ): Promise<AiResult> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-  if (!apiKey) return { text: '', escalate: true } // no AI configured → hand to operator
+  if (!apiKey) return { text: '', escalate: true, operator: false } // no AI configured → hand to operator
 
   let context = ''
   if (ctx.tariffs?.length) {
@@ -64,12 +65,13 @@ export async function askAI(
       }),
     })
     const data = await res.json()
-    if (!res.ok) { console.error('anthropic error', data); return { text: '', escalate: true } }
+    if (!res.ok) { console.error('anthropic error', data); return { text: '', escalate: true, operator: false } }
     const text = (data.content?.[0]?.text ?? '').trim()
-    if (!text || text.includes(ESCALATE)) return { text: text.replace(ESCALATE, '').trim(), escalate: true }
-    return { text, escalate: false }
+    if (text.includes(OPERATOR)) return { text: text.replace(OPERATOR, '').trim(), escalate: false, operator: true }
+    if (!text || text.includes(ESCALATE)) return { text: text.replace(ESCALATE, '').trim(), escalate: true, operator: false }
+    return { text, escalate: false, operator: false }
   } catch (e) {
     console.error('askAI failed', e)
-    return { text: '', escalate: true }
+    return { text: '', escalate: true, operator: false }
   }
 }
