@@ -253,7 +253,20 @@ Deno.serve(async (req) => {
       } else if (text) {
         const { data: wrel } = await db.from('web_relays')
           .select('chat_id').eq('admin_msg_id', replyId).maybeSingle()
-        if (wrel) await db.from('web_messages').insert({ chat_id: wrel.chat_id, role: 'operator', content: text })
+        if (wrel) {
+          const cmd = text.trim().toLowerCase()
+          if (['/close', '/end', '/bot', '/done'].includes(cmd)) {
+            // Operator ends the session → hand the web conversation back to the AI.
+            await db.from('web_chats').update({ mode: 'ai' }).eq('id', wrel.chat_id)
+            await db.from('web_messages').insert({
+              chat_id: wrel.chat_id, role: 'assistant',
+              content: 'Оператор завершив діалог. Якщо буде ще питання — я знову на звʼязку 🤖',
+            })
+            await tg.send(ADMIN_CHAT, '✅ Діалог із сайтом завершено — бот знову відповідає цьому відвідувачу.')
+          } else {
+            await db.from('web_messages').insert({ chat_id: wrel.chat_id, role: 'operator', content: text })
+          }
+        }
       }
       return ok()
     }

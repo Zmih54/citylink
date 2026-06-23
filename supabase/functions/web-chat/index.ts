@@ -11,7 +11,7 @@ async function forwardToOperator(chatId: string, text: string) {
   if (!ADMIN_CHAT) return
   const short = String(chatId).slice(0, 8)
   const head = `🌐 <b>Звернення з сайту</b> <code>${esc(short)}</code>\n` +
-    `<i>відповідайте reply на це повідомлення — відповідь зʼявиться на сайті</i>\n\n`
+    `<i>reply на це повідомлення → відповідь на сайті · надішліть /close щоб завершити діалог</i>\n\n`
   const res = await tg.send(ADMIN_CHAT, head + esc(text))
   const msgId = res?.result?.message_id
   if (msgId) await db.from('web_relays').insert({ admin_msg_id: msgId, chat_id: chatId })
