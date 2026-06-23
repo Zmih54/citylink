@@ -25,19 +25,25 @@ const KNOWLEDGE = `
 - На типові запитання (тарифи, оплата, підключення, базові несправності, графік, контакти) відповідай сам, спираючись на довідку та надані дані тарифів/акаунта.
 - Якщо запитання стосується КОНКРЕТНОЇ проблеми, яку не вирішити порадою (аварія за адресою, скарга, перерахунок, зміна договору, технічний виїзд, повернення коштів, щось поза довідкою) — НЕ вигадуй. Відповідай РІВНО одним рядком: ${ESCALATE}
 - Якщо користувач прямо просить зʼєднати з оператором/людиною (без опису самої проблеми) — відповідай РІВНО одним рядком: ${OPERATOR}
-- Для перегляду балансу/тарифу/історії підкажи натиснути відповідні кнопки меню або команди /balance, /tariff, /history. Для оплати — /pay.
 `
 
 export interface AiResult { text: string; escalate: boolean; operator: boolean }
 
 export async function askAI(
   question: string,
-  ctx: { tariffs?: { name: string; speed: number; price: number }[]; account?: Record<string, unknown> | null },
+  ctx: {
+    tariffs?: { name: string; speed: number; price: number }[]
+    account?: Record<string, unknown> | null
+    channel?: 'telegram' | 'web'
+  },
 ): Promise<AiResult> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) return { text: '', escalate: true, operator: false } // no AI configured → hand to operator
 
-  let context = ''
+  // Channel-specific guidance: commands exist only in Telegram, not on the website.
+  let context = ctx.channel === 'web'
+    ? '\nКАНАЛ: чат на сайті CityLink. НЕ згадуй жодних команд бота (/balance, /tariff, /history, /pay тощо) — на сайті їх не існує. Для перегляду балансу/тарифу/історії направляй у розділ «Особистий кабінет», для оплати — у розділ «Оплата», для тарифів — у розділ «Тарифи».'
+    : '\nКАНАЛ: Telegram-бот. Для перегляду балансу/тарифу/історії підкажи команди /balance, /tariff, /history; для оплати — /pay.'
   if (ctx.tariffs?.length) {
     context += '\nАКТУАЛЬНІ ТАРИФИ:\n' +
       ctx.tariffs.map((t) => `- ${t.name}: до ${t.speed} Мбіт/с — ${t.price} грн/міс`).join('\n')

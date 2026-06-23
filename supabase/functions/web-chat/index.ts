@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const { data: tariffs } = await db
       .from('tariffs').select('name, speed, price').eq('active', true).order('sort_order')
-    const ai = await askAI(text, { tariffs: tariffs ?? [] })
+    const ai = await askAI(text, { tariffs: tariffs ?? [], channel: 'web' })
 
     if (ai.operator || ai.escalate) {
       await db.from('web_chats').update({ mode: 'operator' }).eq('id', chatId)

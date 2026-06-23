@@ -254,7 +254,8 @@ Deno.serve(async (req) => {
         const { data: wrel } = await db.from('web_relays')
           .select('chat_id').eq('admin_msg_id', replyId).maybeSingle()
         if (wrel) {
-          const cmd = text.trim().toLowerCase()
+          // First token, без @імʼя_бота та аргументів: "/close@CityLinkBot" -> "/close".
+          const cmd = text.trim().toLowerCase().split(/[\s@]/)[0]
           if (['/close', '/end', '/bot', '/done'].includes(cmd)) {
             // Operator ends the session → hand the web conversation back to the AI.
             await db.from('web_chats').update({ mode: 'ai' }).eq('id', wrel.chat_id)
@@ -300,7 +301,7 @@ Deno.serve(async (req) => {
     // Free text → AI
     const sub = await getLinkedSubscriber(tgId)
     const tariffs = await listTariffs()
-    const ai = await askAI(text, { tariffs, account: sub })
+    const ai = await askAI(text, { tariffs, account: sub, channel: 'telegram' })
     // AI output is free text — normalise Markdown to safe HTML (also escapes < & >).
     if (ai.operator) {
       // User asked for an operator: don't forward the request phrase — collect
