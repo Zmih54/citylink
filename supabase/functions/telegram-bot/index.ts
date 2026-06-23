@@ -242,11 +242,19 @@ Deno.serve(async (req) => {
     const chatId = msg.chat.id
     const text: string = (msg.text || '').trim()
 
-    // Operator replies inside the admin chat → relay back to the user.
+    // Operator replies inside the admin chat → relay back to the user (Telegram) or
+    // to the website conversation the message came from.
     if (ADMIN_CHAT && String(chatId) === String(ADMIN_CHAT) && msg.reply_to_message) {
+      const replyId = msg.reply_to_message.message_id
       const { data: rel } = await db.from('telegram_relays')
-        .select('user_telegram_id').eq('admin_msg_id', msg.reply_to_message.message_id).maybeSingle()
-      if (rel && text) await tg.send(rel.user_telegram_id, '🧑‍💼 <b>Оператор:</b>\n' + esc(text))
+        .select('user_telegram_id').eq('admin_msg_id', replyId).maybeSingle()
+      if (rel && text) {
+        await tg.send(rel.user_telegram_id, '🧑‍💼 <b>Оператор:</b>\n' + esc(text))
+      } else if (text) {
+        const { data: wrel } = await db.from('web_relays')
+          .select('chat_id').eq('admin_msg_id', replyId).maybeSingle()
+        if (wrel) await db.from('web_messages').insert({ chat_id: wrel.chat_id, role: 'operator', content: text })
+      }
       return ok()
     }
 

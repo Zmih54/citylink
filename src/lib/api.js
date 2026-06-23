@@ -56,6 +56,20 @@ export async function subscriberMe(token) {
   return data.subscriber
 }
 
+// ---- Website support chat ------------------------------------------------
+
+export async function webChatSend(chatId, message) {
+  const { ok, data } = await callFn('web-chat', { chatId, message })
+  if (!ok || data.error) throw new Error('Не вдалося надіслати повідомлення.')
+  return data
+}
+
+export async function webChatPoll(chatId) {
+  const { ok, data } = await callFn('web-chat-poll', { chatId })
+  if (!ok || data.error) return []
+  return data.messages || []
+}
+
 // ---- Public tariffs ------------------------------------------------------
 
 export async function fetchTariffs() {

@@ -18,3 +18,10 @@ verify_jwt = false
 
 [functions.liqpay-callback]
 verify_jwt = false
+
+# Public website support chat (called from the browser with the anon key).
+[functions.web-chat]
+verify_jwt = false
+
+[functions.web-chat-poll]
+verify_jwt = false
