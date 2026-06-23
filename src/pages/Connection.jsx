@@ -1,14 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCircle2, Loader2, ShieldCheck, Clock, Cable, Phone, Send } from 'lucide-react'
 import { PageHero, Reveal } from '../components/ui.jsx'
-import { rates, company } from '../data/site.js'
+import { company } from '../data/site.js'
+import { useTariffs } from '../hooks/useTariffs.js'
 
 const empty = {
   name: '',
   phone: '',
   address: '',
-  tariff: rates.find((r) => r.popular)?.id || rates[0].id,
+  tariff: '',
   contactMethod: 'phone',
   comment: '',
   consent: false,
@@ -25,11 +26,21 @@ function validate(v) {
 }
 
 export default function Connection() {
+  const { tariffs: rates, loading: tariffsLoading } = useTariffs()
   const [form, setForm] = useState(empty)
   const [attempted, setAttempted] = useState(false)
   const [touched, setTouched] = useState({})
   const [status, setStatus] = useState('idle') // idle | sending | done
   const [ticket, setTicket] = useState('')
+
+  // Preselect a default tariff once they load (popular, else the first).
+  useEffect(() => {
+    if (!rates.length) return
+    setForm((f) => {
+      if (f.tariff && rates.some((r) => r.id === f.tariff)) return f
+      return { ...f, tariff: rates.find((r) => r.popular)?.id || rates[0].id }
+    })
+  }, [rates])
 
   const errors = useMemo(() => validate(form), [form])
   const set = (k, val) => setForm((f) => ({ ...f, [k]: val }))
@@ -126,6 +137,15 @@ export default function Connection() {
 
               <div className="mt-5">
                 <span className="label">Бажаний тариф</span>
+                {tariffsLoading ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Завантажуємо тарифи…
+                  </div>
+                ) : rates.length === 0 ? (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-400">
+                    Тарифи тимчасово недоступні. Залиште заявку — менеджер підбере план під ваші потреби.
+                  </div>
+                ) : (
                 <div className="grid gap-3 sm:grid-cols-3">
                   {rates.map((r) => (
                     <button
@@ -140,6 +160,7 @@ export default function Connection() {
                     </button>
                   ))}
                 </div>
+                )}
               </div>
 
               <div className="mt-5">

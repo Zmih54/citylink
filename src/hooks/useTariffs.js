@@ -14,12 +14,16 @@ export function useTariffs() {
     ;(async () => {
       try {
         const data = await fetchTariffs()
-        if (alive && data && data.length) {
+        // `fetchTariffs` returns an array when the backend is reachable
+        // (possibly empty) and `null` only when Supabase isn't configured.
+        // When the backend answers, it's the source of truth — even an
+        // empty list, so tariffs deleted in admin disappear everywhere.
+        if (alive && data) {
           setTariffs(data)
           setFromDb(true)
         }
       } catch {
-        /* keep static fallback */
+        /* offline / backend error → keep static fallback */
       } finally {
         if (alive) setLoading(false)
       }
