@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Globe, Check, Copy, ExternalLink, ShieldCheck, Info } from 'lucide-react'
 import { PageHero, SectionHeader, Reveal } from '../components/ui.jsx'
+import { privat24PayUrl } from '../data/site.js'
 
-const PRIVAT24_URL = 'https://next.privat24.ua/'
 const PRESET = [100, 170, 240, 280, 500, 1000]
 
 export default function Payment() {
   const [contract, setContract] = useState('')
   const [amount, setAmount] = useState('')
   const [copied, setCopied] = useState('')
+
+  const canPay = contract.length > 0 && Number(amount) > 0
 
   const copy = async (text, key) => {
     try {
@@ -20,7 +22,8 @@ export default function Payment() {
   }
 
   const pay = () => {
-    window.open(PRIVAT24_URL, '_blank', 'noopener')
+    if (!canPay) return
+    window.open(privat24PayUrl(contract, amount), '_blank', 'noopener')
   }
 
   return (
@@ -68,15 +71,18 @@ export default function Payment() {
                 ))}
               </div>
 
-              <button onClick={pay} className="btn-primary mt-7 w-full">
+              <button onClick={pay} disabled={!canPay} className="btn-primary mt-7 w-full disabled:opacity-50">
                 Оплатити через Приват24 <ExternalLink className="h-4 w-4" />
               </button>
+              {!canPay && (
+                <p className="mt-2 text-center text-xs text-slate-500">Вкажіть номер договору та суму, щоб перейти до оплати.</p>
+              )}
 
               <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-xs text-amber-100">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  Дані картки вводяться лише на захищеній сторінці ПриватБанку — ми їх не збираємо й не зберігаємо.
-                  Скопіюйте номер договору, у Приват24 знайдіть отримувача <b>CityLink</b> у розділі «Інтернет» і вкажіть суму.
+                  Відкриється форма Приват24 з уже заповненими отримувачем <b>CityLink</b>, вашим договором і сумою —
+                  залишиться лише підтвердити оплату карткою. Дані картки вводяться лише на захищеній сторінці ПриватБанку.
                 </span>
               </div>
             </div>
@@ -90,10 +96,10 @@ export default function Payment() {
               </div>
               <ol className="mt-5 space-y-4 text-sm">
                 {[
+                  'Вкажіть номер договору та суму у формі ліворуч.',
                   'Натисніть «Оплатити через Приват24» — відкриється next.privat24.ua.',
-                  'Авторизуйтесь і оберіть «Усі послуги» → «Інтернет».',
-                  'Знайдіть постачальника CityLink.',
-                  'Введіть номер договору та суму, підтвердіть оплату карткою.',
+                  'Отримувач CityLink, договір і сума вже заповнені — перевірте їх.',
+                  'Авторизуйтесь і підтвердіть оплату карткою будь-якого банку.',
                 ].map((s, i) => (
                   <li key={i} className="flex gap-3">
                     <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-gradient-to-br from-brand-500 to-accent-500 text-xs font-bold text-white">{i + 1}</span>

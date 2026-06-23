@@ -46,6 +46,23 @@ export const rates = [
 
 export const STATIC_IP_PRICE = 50 // грн/міс за реальну (білу) IP-адресу
 
+// Privat24 recipient (CityLink) form token — публічний, потрібен, щоб
+// відкрити форму next.privat24.ua з уже заповненими реквізитами отримувача.
+export const PRIVAT24_TOKEN = '647b2b2d-b02d-4d22-b321-ca7c8748d799'
+
+// Будує deep-link на Приват24 з підставленими сумою, договором
+// (personalAccount) і отримувачем. `encodeURI` кодує лише `{ } "`, лишаючи
+// `:` та `,` як є — саме такий формат очікує Приват24.
+export function privat24PayUrl(contract, amount) {
+  const sum = Number(amount || 0).toFixed(2)
+  const payload = JSON.stringify({
+    sum,
+    personalAccount: String(contract || ''),
+    token: PRIVAT24_TOKEN,
+  })
+  return `https://next.privat24.ua/payments/form/${encodeURI(payload)}?lang`
+}
+
 // News — newest first. Add an object here to publish a new post.
 export const news = [
   {
